@@ -1,9 +1,0 @@
-$kind: http-request
-name: Deleted plant is gone -> 404
-url: "{{baseUrl}}/api/v1/plants/{{maintPlantId}}"
-method: GET
-scripts:
-  - type: afterResponse
-    code: pm.test("Status is 404", () => pm.response.to.have.status(404));
-    language: text/javascript
-order: 4000

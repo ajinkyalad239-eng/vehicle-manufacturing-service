@@ -1,4 +1,0 @@
-name: Local (docker compose / IntelliJ)
-values:
-  - key: baseUrl
-    value: 'http://localhost:8080'
