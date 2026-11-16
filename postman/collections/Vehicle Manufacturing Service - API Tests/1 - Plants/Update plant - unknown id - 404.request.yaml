@@ -1,0 +1,21 @@
+$kind: http-request
+name: Update plant - unknown id -> 404
+url: "{{baseUrl}}/api/v1/plants/999999999"
+method: PUT
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "code": "PM-NOPE",
+      "name": "Postman Assembly Plant",
+      "city": "Yokohama",
+      "country": "Japan",
+      "dailyCapacity": 150
+    }
+scripts:
+  - type: afterResponse
+    code: pm.test("Status is 404", () => pm.response.to.have.status(404));
+    language: text/javascript
+order: 13000

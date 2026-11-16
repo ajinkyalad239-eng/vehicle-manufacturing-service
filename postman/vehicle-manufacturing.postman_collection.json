@@ -1,0 +1,2743 @@
+{
+  "info": {
+    "_postman_id": "16557c44-b6b0-4872-a328-2225976acc4b",
+    "name": "Vehicle Manufacturing Service - API Tests",
+    "description": "End-to-end tests for every endpoint. Run the whole collection in order (Collection Runner or newman). It creates its own uniquely-named data on each run, so it can be repeated against the same database.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Runs after EVERY request in the collection.",
+          "pm.test(\"Correlation id header is returned\", () => pm.response.to.have.header(\"X-Correlation-Id\"));",
+          "pm.test(\"Responds within 2 seconds\", () => pm.expect(pm.response.responseTime).to.be.below(2000));",
+          "if (pm.response.code >= 400) {",
+          "    pm.test(\"Errors use application/problem+json\", () =>",
+          "        pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\"));",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "runId",
+      "value": ""
+    },
+    {
+      "key": "plantCode",
+      "value": ""
+    },
+    {
+      "key": "maintPlantCode",
+      "value": ""
+    },
+    {
+      "key": "modelCode",
+      "value": ""
+    },
+    {
+      "key": "inactiveModelCode",
+      "value": ""
+    },
+    {
+      "key": "plantId",
+      "value": ""
+    },
+    {
+      "key": "maintPlantId",
+      "value": ""
+    },
+    {
+      "key": "modelId",
+      "value": ""
+    },
+    {
+      "key": "inactiveModelId",
+      "value": ""
+    },
+    {
+      "key": "orderId",
+      "value": ""
+    },
+    {
+      "key": "startDate",
+      "value": ""
+    },
+    {
+      "key": "endDate",
+      "value": ""
+    },
+    {
+      "key": "dayBeforeStart",
+      "value": ""
+    },
+    {
+      "key": "actualStartAt",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0 - Health & docs",
+      "item": [
+        {
+          "name": "Readiness probe is UP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Status UP\", () => pm.expect(pm.response.json().status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health/readiness",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health",
+                "readiness"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Liveness probe is UP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Status UP\", () => pm.expect(pm.response.json().status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health/liveness",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "actuator",
+                "health",
+                "liveness"
+              ]
+            }
+          }
+        },
+        {
+          "name": "OpenAPI document is published",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Has production-order paths\", () => pm.expect(pm.response.json().paths).to.have.property(\"/api/v1/production-orders\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/v3/api-docs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "v3",
+                "api-docs"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "1 - Plants",
+      "item": [
+        {
+          "name": "Create plant",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Unique suffix per run so the collection can be run repeatedly against the same database.",
+                  "const runId = Math.random().toString(36).substring(2, 8).toUpperCase();",
+                  "pm.collectionVariables.set(\"runId\", runId);",
+                  "pm.collectionVariables.set(\"plantCode\", \"PM-\" + runId);",
+                  "pm.collectionVariables.set(\"maintPlantCode\", \"PM-M-\" + runId);",
+                  "pm.collectionVariables.set(\"modelCode\", \"PMM-\" + runId);",
+                  "pm.collectionVariables.set(\"inactiveModelCode\", \"PMI-\" + runId);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201\", () => pm.response.to.have.status(201));",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Location header points to new plant\", () =>",
+                  "    pm.expect(pm.response.headers.get(\"Location\")).to.match(new RegExp(\"/api/v1/plants/\" + body.id + \"$\")));",
+                  "pm.test(\"Fields are echoed back\", () => {",
+                  "    pm.expect(body.code).to.eql(pm.collectionVariables.get(\"plantCode\"));",
+                  "    pm.expect(body.dailyCapacity).to.eql(150);",
+                  "    pm.expect(body.status).to.eql(\"ACTIVE\");",
+                  "    pm.expect(body.createdAt).to.be.a(\"string\");",
+                  "});",
+                  "pm.collectionVariables.set(\"plantId\", body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plants",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plants"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{plantCode}}\",\n  \"name\": \"Postman Assembly Plant\",\n  \"city\": \"Yokohama\",\n  \"country\": \"Japan\",\n  \"dailyCapacity\": 150\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create plant - duplicate code -> 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Problem title is 'Duplicate resource'\", () => pm.expect(pm.response.json().title).to.eql(\"Duplicate resource\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plants",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plants"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{plantCode}}\",\n  \"name\": \"Postman Assembly Plant\",\n  \"city\": \"Yokohama\",\n  \"country\": \"Japan\",\n  \"dailyCapacity\": 150\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create plant - invalid fields -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem title is 'Validation failed'\", () => pm.expect(pm.response.json().title).to.eql(\"Validation failed\"));",
+                  "",
+                  "pm.test(\"Field errors are listed\", () => {",
+                  "    const errors = pm.response.json().errors;",
+                  "    pm.expect(errors).to.have.property(\"code\");",
+                  "    pm.expect(errors).to.have.property(\"name\");",
+                  "    pm.expect(errors).to.have.property(\"dailyCapacity\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plants",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plants"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"bad code\",\n  \"name\": \"\",\n  \"city\": \"Yokohama\",\n  \"country\": \"Japan\",\n  \"dailyCapacity\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create plant - malformed JSON -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plants",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plants"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{ \"code\": ",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create second plant in MAINTENANCE",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201\", () => pm.response.to.have.status(201));",
+                  "",
+                  "pm.test(\"Status is MAINTENANCE\", () => pm.expect(pm.response.json().status).to.eql(\"MAINTENANCE\"));",
+                  "pm.collectionVariables.set(\"maintPlantId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plants",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plants"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{maintPlantCode}}\",\n  \"name\": \"Postman Plant Under Maintenance\",\n  \"city\": \"Fukuoka\",\n  \"country\": \"Japan\",\n  \"dailyCapacity\": 500,\n  \"status\": \"MAINTENANCE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get plant by id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correct plant\", () => pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"plantId\"))));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plants/{{plantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plants",
+                "{{plantId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get plant - unknown id -> 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Problem title is 'Resource not found'\", () => pm.expect(pm.response.json().title).to.eql(\"Resource not found\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plants/999999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plants",
+                "999999999"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List plants filtered by MAINTENANCE",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const page = pm.response.json();",
+                  "pm.test(\"Page shape\", () => {",
+                  "    pm.expect(page.content).to.be.an(\"array\");",
+                  "    [\"page\", \"size\", \"totalElements\", \"totalPages\", \"last\"].forEach(k => pm.expect(page).to.have.property(k));",
+                  "});",
+                  "pm.test(\"Every plant matches the filter\", () => page.content.forEach(p => pm.expect(p.status).to.eql(\"MAINTENANCE\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plants?status=MAINTENANCE&size=100",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plants"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "MAINTENANCE"
+                },
+                {
+                  "key": "size",
+                  "value": "100"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List plants - unknown status -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem title is 'Invalid parameter'\", () => pm.expect(pm.response.json().title).to.eql(\"Invalid parameter\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plants?status=BROKEN",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plants"
+              ],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "BROKEN"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List plants - unknown sort property -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem title is 'Invalid sort property'\", () => pm.expect(pm.response.json().title).to.eql(\"Invalid sort property\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plants?sort=doesNotExist",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plants"
+              ],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "doesNotExist"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List plants - page size capped at 100",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Size capped\", () => pm.expect(pm.response.json().size).to.eql(100));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plants?size=500",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plants"
+              ],
+              "query": [
+                {
+                  "key": "size",
+                  "value": "500"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update plant capacity to 200/day",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test(\"Capacity updated, status kept\", () => {",
+                  "    pm.expect(pm.response.json().dailyCapacity).to.eql(200);",
+                  "    pm.expect(pm.response.json().status).to.eql(\"ACTIVE\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plants/{{plantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plants",
+                "{{plantId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{plantCode}}\",\n  \"name\": \"Postman Assembly Plant\",\n  \"city\": \"Yokohama\",\n  \"country\": \"Japan\",\n  \"dailyCapacity\": 200\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Update plant - unknown id -> 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plants/999999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plants",
+                "999999999"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"PM-NOPE\",\n  \"name\": \"Postman Assembly Plant\",\n  \"city\": \"Yokohama\",\n  \"country\": \"Japan\",\n  \"dailyCapacity\": 150\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 - Vehicle models",
+      "item": [
+        {
+          "name": "Create vehicle model",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201\", () => pm.response.to.have.status(201));",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Defaults to active\", () => pm.expect(body.active).to.eql(true));",
+                  "pm.test(\"Price kept\", () => pm.expect(Number(body.basePrice)).to.eql(4250000));",
+                  "pm.collectionVariables.set(\"modelId\", body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/vehicle-models",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vehicle-models"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"modelCode\": \"{{modelCode}}\",\n  \"name\": \"Postman EV\",\n  \"category\": \"CROSSOVER\",\n  \"powertrain\": \"ELECTRIC\",\n  \"launchYear\": 2026,\n  \"basePrice\": 4250000.00\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create inactive vehicle model",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201\", () => pm.response.to.have.status(201));",
+                  "",
+                  "pm.test(\"Inactive\", () => pm.expect(pm.response.json().active).to.eql(false));",
+                  "pm.collectionVariables.set(\"inactiveModelId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/vehicle-models",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vehicle-models"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"modelCode\": \"{{inactiveModelCode}}\",\n  \"name\": \"Postman EV\",\n  \"category\": \"CROSSOVER\",\n  \"powertrain\": \"ELECTRIC\",\n  \"launchYear\": 2026,\n  \"basePrice\": 2600000.00,\n  \"active\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create vehicle model - duplicate code -> 409",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 409\", () => pm.response.to.have.status(409));",
+                  "pm.test(\"Problem title is 'Duplicate resource'\", () => pm.expect(pm.response.json().title).to.eql(\"Duplicate resource\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/vehicle-models",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vehicle-models"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"modelCode\": \"{{modelCode}}\",\n  \"name\": \"Postman EV\",\n  \"category\": \"CROSSOVER\",\n  \"powertrain\": \"ELECTRIC\",\n  \"launchYear\": 2026,\n  \"basePrice\": 4250000.00\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create vehicle model - invalid fields -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem title is 'Validation failed'\", () => pm.expect(pm.response.json().title).to.eql(\"Validation failed\"));",
+                  "",
+                  "pm.test(\"Field errors are listed\", () => {",
+                  "    const errors = pm.response.json().errors;",
+                  "    [\"category\", \"launchYear\", \"basePrice\"].forEach(f => pm.expect(errors).to.have.property(f));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/vehicle-models",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vehicle-models"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"modelCode\": \"PM-X\",\n  \"name\": \"X\",\n  \"category\": null,\n  \"powertrain\": \"ELECTRIC\",\n  \"launchYear\": 1800,\n  \"basePrice\": -1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create vehicle model - unknown powertrain -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/vehicle-models",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vehicle-models"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"modelCode\": \"{{modelCode}}\",\n  \"name\": \"Postman EV\",\n  \"category\": \"CROSSOVER\",\n  \"powertrain\": \"STEAM\",\n  \"launchYear\": 2026,\n  \"basePrice\": 4250000.00\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get vehicle model by id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correct model\", () => pm.expect(pm.response.json().modelCode).to.eql(pm.collectionVariables.get(\"modelCode\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/vehicle-models/{{modelId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vehicle-models",
+                "{{modelId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get vehicle model - unknown id -> 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Problem title is 'Resource not found'\", () => pm.expect(pm.response.json().title).to.eql(\"Resource not found\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/vehicle-models/999999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vehicle-models",
+                "999999999"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List active electric models",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test(\"Every model matches the filters\", () => pm.response.json().content.forEach(m => {",
+                  "    pm.expect(m.powertrain).to.eql(\"ELECTRIC\");",
+                  "    pm.expect(m.active).to.eql(true);",
+                  "}));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/vehicle-models?powertrain=ELECTRIC&active=true&size=100",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vehicle-models"
+              ],
+              "query": [
+                {
+                  "key": "powertrain",
+                  "value": "ELECTRIC"
+                },
+                {
+                  "key": "active",
+                  "value": "true"
+                },
+                {
+                  "key": "size",
+                  "value": "100"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update vehicle model name",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test(\"Name updated, still active\", () => {",
+                  "    pm.expect(pm.response.json().name).to.eql(\"Postman EV Plus\");",
+                  "    pm.expect(pm.response.json().active).to.eql(true);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/vehicle-models/{{modelId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vehicle-models",
+                "{{modelId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"modelCode\": \"{{modelCode}}\",\n  \"name\": \"Postman EV Plus\",\n  \"category\": \"CROSSOVER\",\n  \"powertrain\": \"ELECTRIC\",\n  \"launchYear\": 2026,\n  \"basePrice\": 4250000.00\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 - Production orders",
+      "item": [
+        {
+          "name": "Create production order (1000 vehicles, 5 days, 200/day)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Plan to start tomorrow and finish 5 days later (inclusive).",
+                  "const fmt = d => d.toISOString().substring(0, 10);",
+                  "const start = new Date(); start.setUTCDate(start.getUTCDate() + 1);",
+                  "const end = new Date(start); end.setUTCDate(end.getUTCDate() + 4);",
+                  "const before = new Date(start); before.setUTCDate(before.getUTCDate() - 1);",
+                  "pm.collectionVariables.set(\"startDate\", fmt(start));",
+                  "pm.collectionVariables.set(\"endDate\", fmt(end));",
+                  "pm.collectionVariables.set(\"dayBeforeStart\", fmt(before));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201\", () => pm.response.to.have.status(201));",
+                  "",
+                  "const o = pm.response.json();",
+                  "pm.test(\"Starts PLANNED with no progress\", () => {",
+                  "    pm.expect(o.status).to.eql(\"PLANNED\");",
+                  "    pm.expect(o.completedQuantity).to.eql(0);",
+                  "    pm.expect(o.progressPercent).to.eql(0);",
+                  "    pm.expect(o.actualStartAt).to.eql(null);",
+                  "});",
+                  "pm.test(\"Order number format\", () => pm.expect(o.orderNumber).to.match(/^PO-\\d{8}-[0-9A-F]{6}$/));",
+                  "pm.test(\"Links plant and model\", () => {",
+                  "    pm.expect(o.plantCode).to.eql(pm.collectionVariables.get(\"plantCode\"));",
+                  "    pm.expect(o.modelCode).to.eql(pm.collectionVariables.get(\"modelCode\"));",
+                  "});",
+                  "pm.collectionVariables.set(\"orderId\", o.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plantId\": {{plantId}},\n  \"vehicleModelId\": {{modelId}},\n  \"quantity\": 1000,\n  \"priority\": \"HIGH\",\n  \"plannedStartDate\": \"{{startDate}}\",\n  \"plannedEndDate\": \"{{endDate}}\",\n  \"notes\": \"Created by Postman run {{runId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create order - plant in MAINTENANCE -> 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Problem title is 'Business rule violated'\", () => pm.expect(pm.response.json().title).to.eql(\"Business rule violated\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plantId\": {{maintPlantId}},\n  \"vehicleModelId\": {{modelId}},\n  \"quantity\": 10,\n  \"priority\": \"HIGH\",\n  \"plannedStartDate\": \"{{startDate}}\",\n  \"plannedEndDate\": \"{{endDate}}\",\n  \"notes\": \"Created by Postman run {{runId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create order - inactive model -> 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Problem title is 'Business rule violated'\", () => pm.expect(pm.response.json().title).to.eql(\"Business rule violated\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plantId\": {{plantId}},\n  \"vehicleModelId\": {{inactiveModelId}},\n  \"quantity\": 10,\n  \"priority\": \"HIGH\",\n  \"plannedStartDate\": \"{{startDate}}\",\n  \"plannedEndDate\": \"{{endDate}}\",\n  \"notes\": \"Created by Postman run {{runId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create order - exceeds plant capacity -> 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Problem title is 'Business rule violated'\", () => pm.expect(pm.response.json().title).to.eql(\"Business rule violated\"));",
+                  "pm.test(\"Explains capacity\", () => pm.expect(pm.response.json().detail).to.include(\"at least 6 days\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plantId\": {{plantId}},\n  \"vehicleModelId\": {{modelId}},\n  \"quantity\": 1001,\n  \"priority\": \"HIGH\",\n  \"plannedStartDate\": \"{{startDate}}\",\n  \"plannedEndDate\": \"{{endDate}}\",\n  \"notes\": \"Created by Postman run {{runId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create order - end before start -> 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Problem title is 'Business rule violated'\", () => pm.expect(pm.response.json().title).to.eql(\"Business rule violated\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plantId\": {{plantId}},\n  \"vehicleModelId\": {{modelId}},\n  \"quantity\": 10,\n  \"priority\": \"HIGH\",\n  \"plannedStartDate\": \"{{startDate}}\",\n  \"plannedEndDate\": \"{{dayBeforeStart}}\",\n  \"notes\": \"Created by Postman run {{runId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create order - unknown plant -> 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Problem title is 'Resource not found'\", () => pm.expect(pm.response.json().title).to.eql(\"Resource not found\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plantId\": 999999999,\n  \"vehicleModelId\": {{modelId}},\n  \"quantity\": 10,\n  \"priority\": \"HIGH\",\n  \"plannedStartDate\": \"{{startDate}}\",\n  \"plannedEndDate\": \"{{endDate}}\",\n  \"notes\": \"Created by Postman run {{runId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Create order - missing fields -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem title is 'Validation failed'\", () => pm.expect(pm.response.json().title).to.eql(\"Validation failed\"));",
+                  "",
+                  "pm.test(\"Field errors are listed\", () => {",
+                  "    const errors = pm.response.json().errors;",
+                  "    [\"plantId\", \"vehicleModelId\", \"quantity\", \"plannedStartDate\", \"plannedEndDate\"]",
+                  "        .forEach(f => pm.expect(errors).to.have.property(f));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 0\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get production order by id",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Correct order\", () => pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get(\"orderId\"))));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get production order - unknown id -> 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));",
+                  "pm.test(\"Problem title is 'Resource not found'\", () => pm.expect(pm.response.json().title).to.eql(\"Resource not found\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/999999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "999999999"
+              ]
+            }
+          }
+        },
+        {
+          "name": "List orders for this plant",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Exactly one order\", () => pm.expect(pm.response.json().totalElements).to.eql(1));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders?plantId={{plantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders"
+              ],
+              "query": [
+                {
+                  "key": "plantId",
+                  "value": "{{plantId}}"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List orders - non-numeric plantId -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem title is 'Invalid parameter'\", () => pm.expect(pm.response.json().title).to.eql(\"Invalid parameter\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders?plantId=abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders"
+              ],
+              "query": [
+                {
+                  "key": "plantId",
+                  "value": "abc"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Re-plan order (800 vehicles, CRITICAL)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test(\"Re-planned\", () => {",
+                  "    pm.expect(pm.response.json().quantity).to.eql(800);",
+                  "    pm.expect(pm.response.json().priority).to.eql(\"CRITICAL\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plantId\": {{plantId}},\n  \"vehicleModelId\": {{modelId}},\n  \"quantity\": 800,\n  \"priority\": \"CRITICAL\",\n  \"plannedStartDate\": \"{{startDate}}\",\n  \"plannedEndDate\": \"{{endDate}}\",\n  \"notes\": \"Created by Postman run {{runId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Report progress on PLANNED order -> 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Problem title is 'Business rule violated'\", () => pm.expect(pm.response.json().title).to.eql(\"Business rule violated\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}/progress",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}",
+                "progress"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedQuantity\": 10\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete plant that has orders -> 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Problem title is 'Business rule violated'\", () => pm.expect(pm.response.json().title).to.eql(\"Business rule violated\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plants/{{plantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plants",
+                "{{plantId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete model that has orders -> 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Problem title is 'Business rule violated'\", () => pm.expect(pm.response.json().title).to.eql(\"Business rule violated\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/vehicle-models/{{modelId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vehicle-models",
+                "{{modelId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Start order (PLANNED -> IN_PROGRESS)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test(\"Actual start recorded\", () => pm.expect(pm.response.json().actualStartAt).to.be.a(\"string\"));",
+                  "pm.collectionVariables.set(\"actualStartAt\", pm.response.json().actualStartAt);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Re-plan started order -> 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Problem title is 'Business rule violated'\", () => pm.expect(pm.response.json().title).to.eql(\"Business rule violated\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plantId\": {{plantId}},\n  \"vehicleModelId\": {{modelId}},\n  \"quantity\": 800,\n  \"priority\": \"HIGH\",\n  \"plannedStartDate\": \"{{startDate}}\",\n  \"plannedEndDate\": \"{{endDate}}\",\n  \"notes\": \"Created by Postman run {{runId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Report progress 400/800",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test(\"50% done, still in progress\", () => {",
+                  "    pm.expect(pm.response.json().progressPercent).to.eql(50);",
+                  "    pm.expect(pm.response.json().status).to.eql(\"IN_PROGRESS\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}/progress",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}",
+                "progress"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedQuantity\": 400\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Report lower progress -> 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Problem title is 'Business rule violated'\", () => pm.expect(pm.response.json().title).to.eql(\"Business rule violated\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}/progress",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}",
+                "progress"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedQuantity\": 300\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Report more than ordered -> 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Problem title is 'Business rule violated'\", () => pm.expect(pm.response.json().title).to.eql(\"Business rule violated\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}/progress",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}",
+                "progress"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedQuantity\": 801\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Report negative progress -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem title is 'Validation failed'\", () => pm.expect(pm.response.json().title).to.eql(\"Validation failed\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}/progress",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}",
+                "progress"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedQuantity\": -1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Put order on hold",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"On hold\", () => pm.expect(pm.response.json().status).to.eql(\"ON_HOLD\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ON_HOLD\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Complete from ON_HOLD -> 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Problem title is 'Business rule violated'\", () => pm.expect(pm.response.json().title).to.eql(\"Business rule violated\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"COMPLETED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Resume order (ON_HOLD -> IN_PROGRESS)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test(\"Original start time kept\", () =>",
+                  "    pm.expect(pm.response.json().actualStartAt).to.eql(pm.collectionVariables.get(\"actualStartAt\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Report final progress 800/800 -> auto COMPLETED",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test(\"Completed automatically\", () => {",
+                  "    const o = pm.response.json();",
+                  "    pm.expect(o.status).to.eql(\"COMPLETED\");",
+                  "    pm.expect(o.progressPercent).to.eql(100);",
+                  "    pm.expect(o.actualEndAt).to.be.a(\"string\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}/progress",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}",
+                "progress"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completedQuantity\": 800\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cancel COMPLETED order -> 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Problem title is 'Business rule violated'\", () => pm.expect(pm.response.json().title).to.eql(\"Business rule violated\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CANCELLED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Change status - missing status -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 400\", () => pm.response.to.have.status(400));",
+                  "pm.test(\"Problem title is 'Validation failed'\", () => pm.expect(pm.response.json().title).to.eql(\"Validation failed\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete COMPLETED order -> 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"Problem title is 'Business rule violated'\", () => pm.expect(pm.response.json().title).to.eql(\"Business rule violated\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create second order to cancel",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 201\", () => pm.response.to.have.status(201));",
+                  "",
+                  "pm.test(\"Priority defaults to MEDIUM\", () => pm.expect(pm.response.json().priority).to.eql(\"MEDIUM\"));",
+                  "pm.collectionVariables.set(\"orderId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plantId\": {{plantId}},\n  \"vehicleModelId\": {{modelId}},\n  \"quantity\": 50,\n  \"priority\": null,\n  \"plannedStartDate\": \"{{startDate}}\",\n  \"plannedEndDate\": \"{{endDate}}\",\n  \"notes\": \"Created by Postman run {{runId}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Cancel second order (PLANNED -> CANCELLED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Cancelled with end time\", () => pm.expect(pm.response.json().actualEndAt).to.be.a(\"string\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}/status",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}",
+                "status"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CANCELLED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete cancelled order -> 204",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Deleted order is gone -> 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/production-orders/{{orderId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "production-orders",
+                "{{orderId}}"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 - Cleanup",
+      "item": [
+        {
+          "name": "Retire plant (set INACTIVE; it keeps order history)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Inactive\", () => pm.expect(pm.response.json().status).to.eql(\"INACTIVE\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plants/{{plantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plants",
+                "{{plantId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{plantCode}}\",\n  \"name\": \"Postman Assembly Plant\",\n  \"city\": \"Yokohama\",\n  \"country\": \"Japan\",\n  \"dailyCapacity\": 200,\n  \"status\": \"INACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Retire model (active=false)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 200\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Inactive\", () => pm.expect(pm.response.json().active).to.eql(false));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/vehicle-models/{{modelId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vehicle-models",
+                "{{modelId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"modelCode\": \"{{modelCode}}\",\n  \"name\": \"Postman EV\",\n  \"category\": \"CROSSOVER\",\n  \"powertrain\": \"ELECTRIC\",\n  \"launchYear\": 2026,\n  \"basePrice\": 4250000.00,\n  \"active\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Delete maintenance plant (no orders) -> 204",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plants/{{maintPlantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plants",
+                "{{maintPlantId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Deleted plant is gone -> 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/plants/{{maintPlantId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "plants",
+                "{{maintPlantId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete inactive model (no orders) -> 204",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/vehicle-models/{{inactiveModelId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vehicle-models",
+                "{{inactiveModelId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Deleted model is gone -> 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status is 404\", () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/vehicle-models/{{inactiveModelId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "vehicle-models",
+                "{{inactiveModelId}}"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

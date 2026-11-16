@@ -1,0 +1,24 @@
+$kind: http-request
+name: Create vehicle model - duplicate code -> 409
+url: "{{baseUrl}}/api/v1/vehicle-models"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "modelCode": "{{modelCode}}",
+      "name": "Postman EV",
+      "category": "CROSSOVER",
+      "powertrain": "ELECTRIC",
+      "launchYear": 2026,
+      "basePrice": 4250000.00
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status is 409", () => pm.response.to.have.status(409));
+      pm.test("Problem title is 'Duplicate resource'", () => pm.expect(pm.response.json().title).to.eql("Duplicate resource"));
+    language: text/javascript
+order: 3000

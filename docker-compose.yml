@@ -1,0 +1,40 @@
+# Local stack: PostgreSQL + the API (with demo data).
+#   docker compose up --build        -> API on http://localhost:8080
+#   docker compose up postgres       -> only the database, run the app from IntelliJ
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: manufacturing-postgres
+    environment:
+      POSTGRES_DB: manufacturing
+      POSTGRES_USER: manufacturing
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-manufacturing}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U manufacturing -d manufacturing"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    build: .
+    image: vehicle-manufacturing-service:1.0.0
+    container_name: manufacturing-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: demo
+      DB_URL: jdbc:postgresql://postgres:5432/manufacturing
+      DB_USERNAME: manufacturing
+      DB_PASSWORD: ${DB_PASSWORD:-manufacturing}
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  postgres-data:

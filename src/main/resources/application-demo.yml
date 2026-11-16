@@ -1,0 +1,5 @@
+# Profile for local demos and docker-compose: also loads fictional sample data.
+# Activate with SPRING_PROFILES_ACTIVE=demo. Do NOT enable in production.
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/demo

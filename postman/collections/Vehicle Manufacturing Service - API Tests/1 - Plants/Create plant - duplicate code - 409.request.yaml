@@ -1,0 +1,23 @@
+$kind: http-request
+name: Create plant - duplicate code -> 409
+url: "{{baseUrl}}/api/v1/plants"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "code": "{{plantCode}}",
+      "name": "Postman Assembly Plant",
+      "city": "Yokohama",
+      "country": "Japan",
+      "dailyCapacity": 150
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status is 409", () => pm.response.to.have.status(409));
+      pm.test("Problem title is 'Duplicate resource'", () => pm.expect(pm.response.json().title).to.eql("Duplicate resource"));
+    language: text/javascript
+order: 2000

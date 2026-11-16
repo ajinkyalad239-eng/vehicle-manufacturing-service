@@ -1,0 +1,29 @@
+$kind: http-request
+name: Create vehicle model - invalid fields -> 400
+url: "{{baseUrl}}/api/v1/vehicle-models"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "modelCode": "PM-X",
+      "name": "X",
+      "category": null,
+      "powertrain": "ELECTRIC",
+      "launchYear": 1800,
+      "basePrice": -1
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status is 400", () => pm.response.to.have.status(400));
+      pm.test("Problem title is 'Validation failed'", () => pm.expect(pm.response.json().title).to.eql("Validation failed"));
+
+      pm.test("Field errors are listed", () => {
+          const errors = pm.response.json().errors;
+          ["category", "launchYear", "basePrice"].forEach(f => pm.expect(errors).to.have.property(f));
+      });
+    language: text/javascript
+order: 4000

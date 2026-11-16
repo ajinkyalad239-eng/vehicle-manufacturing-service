@@ -1,0 +1,21 @@
+$kind: http-request
+name: Start order (PLANNED -> IN_PROGRESS)
+url: "{{baseUrl}}/api/v1/production-orders/{{orderId}}/status"
+method: PATCH
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "status": "IN_PROGRESS"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status is 200", () => pm.response.to.have.status(200));
+
+      pm.test("Actual start recorded", () => pm.expect(pm.response.json().actualStartAt).to.be.a("string"));
+      pm.collectionVariables.set("actualStartAt", pm.response.json().actualStartAt);
+    language: text/javascript
+order: 16000

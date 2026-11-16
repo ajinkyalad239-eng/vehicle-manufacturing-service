@@ -1,0 +1,13 @@
+$kind: http-request
+name: List plants - unknown sort property -> 400
+url: "{{baseUrl}}/api/v1/plants?sort=doesNotExist"
+method: GET
+queryParams:
+  sort: doesNotExist
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status is 400", () => pm.response.to.have.status(400));
+      pm.test("Problem title is 'Invalid sort property'", () => pm.expect(pm.response.json().title).to.eql("Invalid sort property"));
+    language: text/javascript
+order: 10000

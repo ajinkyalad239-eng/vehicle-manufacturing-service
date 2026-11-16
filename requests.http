@@ -1,0 +1,59 @@
+### IntelliJ HTTP client: click the ▶ next to each request.
+@base = http://localhost:8080/api/v1
+
+### List plants
+GET {{base}}/plants
+
+### Create a plant
+POST {{base}}/plants
+Content-Type: application/json
+
+{
+  "code": "JP-TCG-01",
+  "name": "Tochigi Assembly Plant",
+  "city": "Kaminokawa",
+  "country": "Japan",
+  "dailyCapacity": 700
+}
+
+### Create a vehicle model
+POST {{base}}/vehicle-models
+Content-Type: application/json
+
+{
+  "modelCode": "ZEN-SEDAN",
+  "name": "Zen Sedan",
+  "category": "SEDAN",
+  "powertrain": "HYBRID",
+  "launchYear": 2026,
+  "basePrice": 3150000.00
+}
+
+### Create a production order (use ids returned above)
+POST {{base}}/production-orders
+Content-Type: application/json
+
+{
+  "plantId": 1,
+  "vehicleModelId": 1,
+  "quantity": 3000,
+  "priority": "HIGH",
+  "plannedStartDate": "2026-12-01",
+  "plannedEndDate": "2026-12-10",
+  "notes": "Year-end dealer allocation"
+}
+
+### Start the order (replace 4 with the id returned by the create request)
+PATCH {{base}}/production-orders/4/status
+Content-Type: application/json
+
+{ "status": "IN_PROGRESS" }
+
+### Report progress
+PATCH {{base}}/production-orders/4/progress
+Content-Type: application/json
+
+{ "completedQuantity": 1200 }
+
+### Filter orders
+GET {{base}}/production-orders?status=IN_PROGRESS&plantId=1&sort=priority,desc

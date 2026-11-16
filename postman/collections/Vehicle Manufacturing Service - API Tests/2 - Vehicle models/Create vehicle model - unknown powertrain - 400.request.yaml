@@ -1,0 +1,22 @@
+$kind: http-request
+name: Create vehicle model - unknown powertrain -> 400
+url: "{{baseUrl}}/api/v1/vehicle-models"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "modelCode": "{{modelCode}}",
+      "name": "Postman EV",
+      "category": "CROSSOVER",
+      "powertrain": "STEAM",
+      "launchYear": 2026,
+      "basePrice": 4250000.00
+    }
+scripts:
+  - type: afterResponse
+    code: pm.test("Status is 400", () => pm.response.to.have.status(400));
+    language: text/javascript
+order: 5000

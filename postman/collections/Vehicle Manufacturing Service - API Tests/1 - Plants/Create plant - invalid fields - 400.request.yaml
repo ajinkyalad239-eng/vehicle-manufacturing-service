@@ -1,0 +1,30 @@
+$kind: http-request
+name: Create plant - invalid fields -> 400
+url: "{{baseUrl}}/api/v1/plants"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "code": "bad code",
+      "name": "",
+      "city": "Yokohama",
+      "country": "Japan",
+      "dailyCapacity": 0
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status is 400", () => pm.response.to.have.status(400));
+      pm.test("Problem title is 'Validation failed'", () => pm.expect(pm.response.json().title).to.eql("Validation failed"));
+
+      pm.test("Field errors are listed", () => {
+          const errors = pm.response.json().errors;
+          pm.expect(errors).to.have.property("code");
+          pm.expect(errors).to.have.property("name");
+          pm.expect(errors).to.have.property("dailyCapacity");
+      });
+    language: text/javascript
+order: 3000
