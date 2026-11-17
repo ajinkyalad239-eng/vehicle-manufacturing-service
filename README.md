@@ -184,7 +184,12 @@ mvn verify -DskipITs  # coverage gate without integration tests
 * **Integration tests** (`*IT`, Testcontainers PostgreSQL) run real Flyway migrations, Hibernate schema
   validation, the JPQL filters and the whole order life-cycle.
 * **JaCoCo** fails the build if line **or** branch coverage is below 100% (`coverage.minimum` in `pom.xml`).
-  Report: `target/site/jacoco/index.html`.
+  Report: `target/site/jacoco/index.html`. `ManufacturingApplication` (only `SpringApplication.run`) is
+  excluded; constant holders such as `Roles` have no executable code, so JaCoCo does not count them.
+* **Coverage in IntelliJ:** use the shared run configuration **All unit tests with coverage** (`.run/`) →
+  *Run with Coverage*. It uses the JaCoCo runner and the same exclusions as `pom.xml`, so it matches CI.
+  IntelliJ's default runner counts the excluded classes and shows less than 100%. The CI gate is the
+  source of truth.
 
 ### Postman
 `postman/vehicle-manufacturing.postman_collection.json` holds **76 requests with assertions** in 6 folders
