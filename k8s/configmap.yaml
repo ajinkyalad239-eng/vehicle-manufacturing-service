@@ -9,5 +9,9 @@ data:
   DB_URL: jdbc:postgresql://postgres:5432/manufacturing
   DB_POOL_SIZE: "10"
   APP_LOG_LEVEL: INFO
+  # Token issuer as seen by clients (Postman via port-forward) and the in-cluster key endpoint.
+  OAUTH2_ISSUER_URI: http://localhost:8180/realms/manufacturing
+  OAUTH2_JWK_SET_URI: http://keycloak:8180/realms/manufacturing/protocol/openid-connect/certs
+  OAUTH2_AUDIENCE: vehicle-manufacturing-api
   # Use "prod,demo" only on non-production clusters that should load sample data.
   SPRING_PROFILES_ACTIVE: prod

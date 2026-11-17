@@ -87,14 +87,14 @@ public class ProductionOrderService {
                     "Cannot change order %s from %s to %s".formatted(order.getOrderNumber(), current, target));
         }
         if (target == ProductionOrderStatus.IN_PROGRESS && order.getActualStartAt() == null) {
-            order.setActualStartAt(Instant.now());
+            order.setActualStartAt(now());
         }
         if (target == ProductionOrderStatus.COMPLETED) {
             order.setCompletedQuantity(order.getQuantity());
-            order.setActualEndAt(Instant.now());
+            order.setActualEndAt(now());
         }
         if (target == ProductionOrderStatus.CANCELLED) {
-            order.setActualEndAt(Instant.now());
+            order.setActualEndAt(now());
         }
         order.setStatus(target);
         return ProductionOrderResponse.from(orderRepository.saveAndFlush(order));
@@ -121,7 +121,7 @@ public class ProductionOrderService {
         order.setCompletedQuantity(completedQuantity);
         if (completedQuantity == order.getQuantity()) {
             order.setStatus(ProductionOrderStatus.COMPLETED);
-            order.setActualEndAt(Instant.now());
+            order.setActualEndAt(now());
         }
         return ProductionOrderResponse.from(orderRepository.saveAndFlush(order));
     }
@@ -177,6 +177,15 @@ public class ProductionOrderService {
         order.setPlannedStartDate(request.plannedStartDate());
         order.setPlannedEndDate(request.plannedEndDate());
         order.setNotes(request.notes());
+    }
+
+    /**
+     * Current time at the precision PostgreSQL stores (microseconds). Without this, the response
+     * right after an update could show more digits (e.g. Windows clocks give 100 ns) than the same
+     * value read back later, so the API would return two different values for one timestamp.
+     */
+    private static Instant now() {
+        return Instant.now().truncatedTo(ChronoUnit.MICROS);
     }
 
     /** e.g. PO-20261116-3F9A1C */

@@ -3,7 +3,7 @@
 A REST API for a car maker's production planning. It manages **assembly plants**, the **vehicle models**
 they build, and **production orders** ("build 1,000 Aurora EVs at the Kanto plant between 1 and 10 Dec").
 
-**Stack:** Java 21 · Spring Boot 3.5 · Spring Data JPA · PostgreSQL 16 · Flyway · Docker · Kubernetes ·
+**Stack:** Java 21 · Spring Boot 3.5 · Spring Data JPA · Spring Security (OAuth2 / JWT) · Keycloak · PostgreSQL 16 · Flyway · Docker · Kubernetes ·
 JUnit 5 / Mockito / Testcontainers · JaCoCo (100% line + branch gate) · Postman / newman · GitHub Actions
 
 ---
@@ -15,7 +15,7 @@ Client (Postman / UI)
       │  HTTP/JSON
       ▼
 ┌──────────────────────────── vehicle-manufacturing-service ────────────────────────────┐
-│ CorrelationIdFilter  →  Controller  →  Service (business rules, @Transactional)  →  Repository │
+│ CorrelationIdFilter → JWT security → Controller  →  Service (business rules, @Transactional)  →  Repository │
 │                          (validation)       │                                         (JPA)      │
 │ GlobalExceptionHandler  ◄── exceptions ─────┘                                                   │
 └───────────────────────────────────────────────────────────────────────────────────┬────────────┘
@@ -31,6 +31,7 @@ src/main/java/com/example/manufacturing/
 ├── vehiclemodel/      VehicleModel ...
 ├── productionorder/   ProductionOrder, status life-cycle, capacity rules ...
 ├── common/            exceptions + RFC 9457 error handler, PageResponse, correlation-id filter
+├── security/          JWT validation, role rules, 401/403 responses
 └── config/            OpenAPI
 src/main/resources/
 ├── application.yml          all settings, overridable by environment variables
@@ -90,16 +91,66 @@ Interactive docs: **http://localhost:8080/swagger-ui.html**
 Operations: `/actuator/health/liveness`, `/actuator/health/readiness`, `/actuator/prometheus`, `/actuator/info`.
 Every response carries an `X-Correlation-Id` header (send your own to trace a request through the logs).
 
+## 3a. Security (authentication and roles)
+
+Every `/api/**` call needs an **OAuth2 access token (JWT)** from **Keycloak**, sent as
+`Authorization: Bearer <token>`. The app checks the signature (Keycloak's public keys), the issuer,
+the expiry and the audience (`vehicle-manufacturing-api`), then applies role rules.
+
+| Role | Read | Plants / models (create, update, delete) | Create, re-plan, delete orders | Change order status | Report progress |
+|---|---|---|---|---|---|
+| `VIEWER` | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `PLANNER` | ✅ | ❌ | ✅ | ✅ | ❌ |
+| `SUPERVISOR` | ✅ | ❌ | ❌ | ✅ | ✅ |
+| `ADMIN` | ✅ | ✅ | ✅ | ✅ | ✅ |
+
+No token or an invalid token → `401`; a valid token with the wrong role → `403` (both as problem+json).
+Public without a token: `/actuator/health/**`, `/actuator/info`, `/actuator/prometheus`, Swagger UI and `/v3/api-docs`.
+
+**Keycloak realm** `manufacturing` (file `k8s/keycloak/manufacturing-realm.json`, used by docker-compose and Kubernetes):
+
+| User | Password | Role |
+|---|---|---|
+| `viewer` | `viewer123` | VIEWER |
+| `planner` | `planner123` | PLANNER |
+| `supervisor` | `supervisor123` | SUPERVISOR |
+| `admin` | `admin123` | ADMIN |
+
+These users and the `manufacturing-cli` client (password grant) are **for development and testing only**.
+In production, use real users and an authorization-code flow (or your company identity provider) and set
+`OAUTH2_ISSUER_URI`, `OAUTH2_JWK_SET_URI` and `OAUTH2_AUDIENCE` accordingly.
+
+**Get a token (PowerShell):**
+```powershell
+$t = (Invoke-RestMethod -Method Post -Uri http://localhost:8180/realms/manufacturing/protocol/openid-connect/token `
+      -Body @{ grant_type="password"; client_id="manufacturing-cli"; username="planner"; password="planner123" }).access_token
+Invoke-RestMethod http://localhost:8080/api/v1/plants -Headers @{ Authorization = "Bearer $t" }
+```
+In **Swagger UI**, click **Authorize** and paste the token.
+
+### Running Keycloak without Docker (Windows)
+1. Download `keycloak-26.4.0.zip` from https://github.com/keycloak/keycloak/releases/tag/26.4.0 and extract it, e.g. to `C:\tools\keycloak-26.4.0`.
+2. In PowerShell:
+   ```powershell
+   cd C:\tools\keycloak-26.4.0
+   New-Item -ItemType Directory -Force data\import | Out-Null
+   Copy-Item C:\Users\<you>\Desktop\vehicle-manufacturing-service\k8s\keycloak\manufacturing-realm.json data\import\
+   $env:KC_BOOTSTRAP_ADMIN_USERNAME = "admin"; $env:KC_BOOTSTRAP_ADMIN_PASSWORD = "admin"
+   .\bin\kc.bat start-dev --http-port 8180 --import-realm
+   ```
+3. Keycloak runs on http://localhost:8180 (admin console: `admin` / `admin`). The app's defaults already point there.
+
 ## 4. Run it
 
 ### Option A – everything in Docker (quickest)
 ```bash
 docker compose up --build
 # API: http://localhost:8080   (demo data loaded)
+# Keycloak: http://localhost:8180   (realm "manufacturing" with test users)
 ```
 
 ### Option B – database in Docker, app in IntelliJ
-1. `docker compose up -d postgres`
+1. `docker compose up -d postgres keycloak` (or PostgreSQL installed locally + Keycloak from the zip, see 3a)
 2. Open the folder in IntelliJ (**File → Open**), let Maven import, set SDK to Java 21.
 3. Run `ManufacturingApplication`. For sample data add `demo` under
    **Run → Edit Configurations → Active profiles**.
@@ -114,6 +165,9 @@ docker compose up --build
 | `SERVER_PORT` | `8080` |
 | `SPRING_PROFILES_ACTIVE` | *(none)* – use `demo` for sample data |
 | `APP_LOG_LEVEL` | `INFO` |
+| `OAUTH2_ISSUER_URI` | `http://localhost:8180/realms/manufacturing` |
+| `OAUTH2_JWK_SET_URI` | `http://localhost:8180/realms/manufacturing/protocol/openid-connect/certs` |
+| `OAUTH2_AUDIENCE` | `vehicle-manufacturing-api` |
 
 ## 5. Tests and quality gates
 
@@ -124,6 +178,7 @@ mvn verify -DskipITs  # coverage gate without integration tests
 ```
 
 * **Unit tests** (Mockito) cover every branch of every service rule and the full 5×5 status-transition matrix.
+* **Security tests** check the full role × endpoint access matrix, 401/403 responses and role mapping.
 * **Controller tests** (`@WebMvcTest`) cover every endpoint, validation errors, bad parameters, malformed JSON
   and every error status.
 * **Integration tests** (`*IT`, Testcontainers PostgreSQL) run real Flyway migrations, Hibernate schema
@@ -132,8 +187,9 @@ mvn verify -DskipITs  # coverage gate without integration tests
   Report: `target/site/jacoco/index.html`.
 
 ### Postman
-`postman/vehicle-manufacturing.postman_collection.json` holds **63 requests with assertions** in 5 folders
-(health, plants, models, orders, cleanup). They cover every endpoint, every validation error, every business
+`postman/vehicle-manufacturing.postman_collection.json` holds **76 requests with assertions** in 6 folders
+(health, authentication & roles, plants, models, orders, cleanup). It first logs in to Keycloak as each
+test user, checks the 401/403 rules, then runs the main flow with the admin token. **Keycloak must be running.** They cover every endpoint, every validation error, every business
 rule and every status transition. After each request a collection-level check verifies the correlation-id
 header, a response time under 2 s and `application/problem+json` for errors.
 Each run uses unique codes, so you can repeat it against the same database.
@@ -151,8 +207,8 @@ docker compose and runs the Postman collection with newman on every push and pul
 
 ## 6. Kubernetes
 
-Manifests are in `k8s/`: namespace, ConfigMap, Secret (placeholder), PostgreSQL StatefulSet with a persistent
-volume, Deployment (2 replicas, rolling updates with zero unavailable pods, startup/liveness/readiness probes,
+Manifests are in `k8s/`: namespace, ConfigMap, Secrets (placeholders), PostgreSQL StatefulSet with a persistent
+volume, Keycloak (dev mode, realm imported from a generated ConfigMap), Deployment (2 replicas, rolling updates with zero unavailable pods, startup/liveness/readiness probes,
 resource limits, non-root user, read-only root filesystem), Service, PodDisruptionBudget, HPA (2–6 pods at 70%
 CPU) and Ingress.
 
@@ -171,6 +227,7 @@ kubectl -n manufacturing get pods -w           # wait until both app pods are Re
 echo "$(minikube ip) manufacturing.local" | sudo tee -a /etc/hosts
 curl http://manufacturing.local/actuator/health/readiness
 ```
+Also forward Keycloak so Postman can log in: `kubectl -n manufacturing port-forward svc/keycloak 8180:8180`.
 Then run Postman with `postman/kubernetes.postman_environment.json`.
 Without an ingress: `kubectl -n manufacturing port-forward svc/vehicle-manufacturing-service 8080:80`.
 
@@ -178,11 +235,8 @@ Without an ingress: `kubectl -n manufacturing port-forward svc/vehicle-manufactu
 1. Push the image to your registry and update `image:` in `k8s/app.yaml`.
 2. Replace `k8s/secret.yaml` with a secret from your secret manager.
 3. Prefer a managed PostgreSQL and point `DB_URL` in `k8s/configmap.yaml` at it.
-4. Add authentication (see below).
+4. Replace the dev Keycloak with your production identity provider (see 3a).
 
 ## 7. Not included yet
 
-* **Authentication / authorisation.** The API is open. Typical next step: Spring Security as an OAuth2
-  resource server that validates JWTs from your identity provider (Keycloak, Azure AD, Okta...), with roles such as
-  `PLANNER` (create and re-plan orders) and `LINE_SUPERVISOR` (report progress).
 * Audit trail of who changed what, and event publishing (Kafka) when an order changes status.

@@ -35,16 +35,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Start PostgreSQL and the API
+      - name: Start PostgreSQL, Keycloak and the API
         run: docker compose up -d --build
 
-      - name: Wait until the API is ready
+      - name: Wait until Keycloak and the API are ready
         run: |
-          for i in $(seq 1 60); do
-            curl -sf http://localhost:8080/actuator/health/readiness && exit 0
+          for i in $(seq 1 100); do
+            if curl -sf http://localhost:8180/realms/manufacturing >/dev/null \
+               && curl -sf http://localhost:8080/actuator/health/readiness; then
+              exit 0
+            fi
             sleep 3
           done
-          docker compose logs app
+          docker compose logs keycloak app
           exit 1
 
       - uses: actions/setup-node@v4

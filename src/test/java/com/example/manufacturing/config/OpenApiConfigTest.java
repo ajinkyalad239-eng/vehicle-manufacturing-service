@@ -13,5 +13,8 @@ class OpenApiConfigTest {
 
         assertThat(openApi.getInfo().getTitle()).isEqualTo("Vehicle Manufacturing Service API");
         assertThat(openApi.getInfo().getVersion()).isEqualTo("v1");
+        assertThat(openApi.getComponents().getSecuritySchemes()).containsKey(OpenApiConfig.BEARER_SCHEME);
+        assertThat(openApi.getSecurity()).singleElement()
+                .satisfies(requirement -> assertThat(requirement).containsKey(OpenApiConfig.BEARER_SCHEME));
     }
 }

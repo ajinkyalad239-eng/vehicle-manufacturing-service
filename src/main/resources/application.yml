@@ -27,6 +27,18 @@ spring:
     problemdetails:
       enabled: true
 
+  # Access tokens are issued by Keycloak (realm "manufacturing").
+  #   issuer-uri  : must equal the "iss" claim inside tokens (the URL clients use to log in)
+  #   jwk-set-uri : where this app downloads Keycloak's public signing keys (may be an internal URL)
+  #   audiences   : the token must be meant for this API
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${OAUTH2_ISSUER_URI:http://localhost:8180/realms/manufacturing}
+          jwk-set-uri: ${OAUTH2_JWK_SET_URI:http://localhost:8180/realms/manufacturing/protocol/openid-connect/certs}
+          audiences: ${OAUTH2_AUDIENCE:vehicle-manufacturing-api}
+
   data:
     web:
       pageable:
