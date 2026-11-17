@@ -230,6 +230,8 @@ class ProductionOrderServiceTest {
 
             assertThat(response.status()).isEqualTo(ProductionOrderStatus.IN_PROGRESS);
             assertThat(response.actualStartAt()).isNotNull();
+            // Must match what PostgreSQL stores (microseconds), so later reads return the same value.
+            assertThat(response.actualStartAt().getNano() % 1_000).isZero();
             assertThat(response.actualEndAt()).isNull();
         }
 

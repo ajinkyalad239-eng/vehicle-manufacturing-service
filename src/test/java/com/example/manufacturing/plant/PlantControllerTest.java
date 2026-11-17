@@ -7,7 +7,11 @@ import com.example.manufacturing.plant.dto.PlantRequest;
 import com.example.manufacturing.plant.dto.PlantResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import com.example.manufacturing.security.SecurityConfig;
+import com.example.manufacturing.support.AdminTokenByDefault;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -35,6 +39,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(PlantController.class)
+@Import({SecurityConfig.class, AdminTokenByDefault.class})
 class PlantControllerTest {
 
     private static final String BASE = "/api/v1/plants";
@@ -53,6 +58,10 @@ class PlantControllerTest {
 
     @MockitoBean
     private PlantService plantService;
+
+    /** Never called: requests carry a ready-made test token (see AdminTokenByDefault). */
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
 
     @Test
     void list_returnsPageAndCorrelationId() throws Exception {

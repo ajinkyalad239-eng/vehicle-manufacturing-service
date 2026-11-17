@@ -7,5 +7,13 @@ resources:
   - configmap.yaml
   - secret.yaml
   - postgres.yaml
+  - keycloak.yaml
   - app.yaml
   - ingress.yaml
+configMapGenerator:
+  # Same realm file docker-compose uses: roles, Postman client and test users.
+  - name: keycloak-realm
+    files:
+      - keycloak/manufacturing-realm.json
+generatorOptions:
+  disableNameSuffixHash: true

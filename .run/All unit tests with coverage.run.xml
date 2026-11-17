@@ -1,0 +1,35 @@
+<component name="ProjectRunConfigurationManager">
+  <!--
+    Shared IntelliJ run configuration: Run > "All unit tests with coverage" > Run with Coverage.
+    Uses the JaCoCo runner and the same exclusions as jacoco-maven-plugin in pom.xml,
+    so the IDE shows the same numbers as the CI gate (`mvn verify`).
+  -->
+  <configuration default="false" name="All unit tests with coverage" type="JUnit" factoryName="JUnit">
+    <module name="vehicle-manufacturing-service" />
+    <option name="TEST_OBJECT" value="directory" />
+    <dir value="$PROJECT_DIR$/src/test/java" />
+    <!-- Unit and controller tests only; *IT integration tests need Docker and run in `mvn verify` -->
+    <option name="PATTERN" value="^(?!.*IT$).*" />
+    <extension name="coverage" runner="jacoco">
+      <pattern>
+        <option name="PATTERN" value="com.example.manufacturing.*" />
+        <option name="ENABLED" value="true" />
+      </pattern>
+      <!-- Same as <excludes> in pom.xml: bootstrap class that only calls SpringApplication.run(...) -->
+      <pattern>
+        <option name="PATTERN" value="com.example.manufacturing.ManufacturingApplication" />
+        <option name="ENABLED" value="true" />
+        <option name="INCLUDE" value="false" />
+      </pattern>
+      <!-- Compile-time constants holder (inlined by javac, never loaded); JaCoCo ignores its private constructor -->
+      <pattern>
+        <option name="PATTERN" value="com.example.manufacturing.security.Roles" />
+        <option name="ENABLED" value="true" />
+        <option name="INCLUDE" value="false" />
+      </pattern>
+    </extension>
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

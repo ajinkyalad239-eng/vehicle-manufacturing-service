@@ -1,6 +1,6 @@
-# Local stack: PostgreSQL + the API (with demo data).
-#   docker compose up --build        -> API on http://localhost:8080
-#   docker compose up postgres       -> only the database, run the app from IntelliJ
+# Local stack: PostgreSQL + Keycloak (login server) + the API (with demo data).
+#   docker compose up --build        -> API http://localhost:8080, Keycloak http://localhost:8180
+#   docker compose up postgres keycloak   -> only the infrastructure, run the app from IntelliJ
 services:
   postgres:
     image: postgres:16-alpine
@@ -20,6 +20,30 @@ services:
       retries: 10
     restart: unless-stopped
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4.0
+    container_name: manufacturing-keycloak
+    # Dev mode with the "manufacturing" realm (roles + test users) imported on start-up.
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      # Tokens always say iss=http://localhost:8180/... , whichever URL was used to reach Keycloak.
+      KC_HOSTNAME: http://localhost:8180
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8180:8080"
+    volumes:
+      - ./k8s/keycloak/manufacturing-realm.json:/opt/keycloak/data/import/manufacturing-realm.json:ro
+    healthcheck:
+      # The image has no curl/wget, so use bash's /dev/tcp against the management port.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
   app:
     build: .
     image: vehicle-manufacturing-service:1.0.0
@@ -27,11 +51,17 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      keycloak:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: demo
       DB_URL: jdbc:postgresql://postgres:5432/manufacturing
       DB_USERNAME: manufacturing
       DB_PASSWORD: ${DB_PASSWORD:-manufacturing}
+      # Must match the "iss" claim in tokens (what Postman/browsers use)...
+      OAUTH2_ISSUER_URI: http://localhost:8180/realms/manufacturing
+      # ...while signing keys are fetched over the internal Docker network.
+      OAUTH2_JWK_SET_URI: http://keycloak:8080/realms/manufacturing/protocol/openid-connect/certs
     ports:
       - "8080:8080"
     restart: unless-stopped

@@ -6,7 +6,11 @@ import com.example.manufacturing.vehiclemodel.dto.VehicleModelRequest;
 import com.example.manufacturing.vehiclemodel.dto.VehicleModelResponse;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import com.example.manufacturing.security.SecurityConfig;
+import com.example.manufacturing.support.AdminTokenByDefault;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
@@ -33,6 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(VehicleModelController.class)
+@Import({SecurityConfig.class, AdminTokenByDefault.class})
 class VehicleModelControllerTest {
 
     private static final String BASE = "/api/v1/vehicle-models";
@@ -51,6 +56,10 @@ class VehicleModelControllerTest {
 
     @MockitoBean
     private VehicleModelService vehicleModelService;
+
+    /** Never called: requests carry a ready-made test token (see AdminTokenByDefault). */
+    @MockitoBean
+    private JwtDecoder jwtDecoder;
 
     @Test
     void list_withoutFilters_returnsPage() throws Exception {
