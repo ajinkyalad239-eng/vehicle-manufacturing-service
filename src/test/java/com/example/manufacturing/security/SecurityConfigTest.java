@@ -3,6 +3,7 @@ package com.example.manufacturing.security;
 import com.example.manufacturing.plant.PlantService;
 import com.example.manufacturing.productionorder.ProductionOrderService;
 import com.example.manufacturing.vehiclemodel.VehicleModelService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -54,6 +55,13 @@ class SecurityConfigTest {
     @MockitoBean
     private JwtDecoder jwtDecoder;
 
+
+    @BeforeEach
+    void stubListEndpoints() {
+        when(plantService.findAll(any(), any())).thenReturn(Page.empty());
+        when(productionOrderService.findAll(any(), any(), any(), any())).thenReturn(Page.empty());
+    }
+
     @ParameterizedTest(name = "{2} {0} {1} -> allowed={3}")
     @CsvSource({
             // Reading: every role
@@ -93,7 +101,7 @@ class SecurityConfigTest {
                 .andReturn().getResponse().getStatus();
 
         if (allowed) {
-            assertThat(status).as("status for %s %s as %s", method, path, role).isNotIn(401, 403);
+            assertThat(status).as("status for %s %s as %s", method, path, role).isNotIn(401, 403, 500);
         } else {
             assertThat(status).as("status for %s %s as %s", method, path, role).isEqualTo(403);
         }
